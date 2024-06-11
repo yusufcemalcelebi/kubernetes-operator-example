@@ -17,8 +17,16 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,22 +44,137 @@ type EmailReconciler struct {
 // +kubebuilder:rbac:groups=example.emailsender.yusuf,resources=emails,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=example.emailsender.yusuf,resources=emails/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=example.emailsender.yusuf,resources=emails/finalizers,verbs=update
+// +kubebuilder:rbac:groups=example.emailsender.yusuf,resources=emailsenderconfigs,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Email object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.2/pkg/reconcile
+// Reconcile is part of the main Kubernetes reconciliation loop
 func (r *EmailReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// Fetch the Email instance
+	email := &examplev1.Email{}
+	err := r.Get(ctx, req.NamespacedName, email)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Object not found, return. Created objects are automatically garbage collected.
+			// For additional cleanup logic use finalizers.
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		return ctrl.Result{}, err
+	}
+
+	// Fetch the referenced EmailSenderConfig
+	senderConfig := &examplev1.EmailSenderConfig{}
+	err = r.Get(ctx, client.ObjectKey{Name: email.Spec.SenderConfigRef, Namespace: email.Namespace}, senderConfig)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Error(err, "Referenced EmailSenderConfig not found", "name", email.Spec.SenderConfigRef)
+			email.Status.DeliveryStatus = "Failed"
+			email.Status.Error = fmt.Sprintf("Referenced EmailSenderConfig %s not found", email.Spec.SenderConfigRef)
+			_ = r.Status().Update(ctx, email)
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
+	// Validate the email fields
+	if !isValidEmail(email.Spec.RecipientEmail) {
+		errMsg := "Invalid recipient email format"
+		logger.Error(errors.New(errMsg), errMsg)
+		email.Status.DeliveryStatus = "Failed"
+		email.Status.Error = errMsg
+		_ = r.Status().Update(ctx, email)
+		return ctrl.Result{}, nil
+	}
+
+	// Send the email using MailerSend API
+	apiToken, err := r.getSecretValue(ctx, senderConfig.Spec.APITokenSecretRef, email.Namespace)
+	if err != nil {
+		logger.Error(err, "Failed to retrieve API token from secret")
+		email.Status.DeliveryStatus = "Failed"
+		email.Status.Error = "Failed to retrieve API token from secret"
+		_ = r.Status().Update(ctx, email)
+		return ctrl.Result{}, nil
+	}
+
+	err = sendEmail(apiToken, senderConfig.Spec.SenderEmail, email.Spec.RecipientEmail, email.Spec.Subject, email.Spec.Body)
+	if err != nil {
+		logger.Error(err, "Failed to send email")
+		email.Status.DeliveryStatus = "Failed"
+		email.Status.Error = err.Error()
+		_ = r.Status().Update(ctx, email)
+		return ctrl.Result{}, nil
+	}
+
+	// Update status to reflect successful delivery
+	email.Status.DeliveryStatus = "Sent"
+	email.Status.MessageId = "some-message-id" // Replace with actual message ID if available TODO
+	email.Status.Error = ""
+	err = r.Status().Update(ctx, email)
+	if err != nil {
+		logger.Error(err, "Failed to update Email status")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
+}
+
+// getSecretValue retrieves the secret value from the specified secret and key
+func (r *EmailReconciler) getSecretValue(ctx context.Context, secretName, namespace string) (string, error) {
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: namespace}, secret)
+	if err != nil {
+		return "", err
+	}
+
+	apiToken, exists := secret.Data["apiToken"]
+	if !exists {
+		return "", errors.New("apiToken not found in secret")
+	}
+
+	return string(apiToken), nil
+}
+
+// sendEmail sends an email using the MailerSend API
+func sendEmail(apiToken, senderEmail, recipientEmail, subject, body string) error {
+	emailData := map[string]interface{}{
+		"from": map[string]string{
+			"email": senderEmail,
+		},
+		"to": []map[string]string{
+			{"email": recipientEmail},
+		},
+		"subject": subject,
+		"text":    body,
+	}
+
+	emailDataJSON, err := json.Marshal(emailData)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", "https://api.mailersend.com/v1/email", bytes.NewBuffer(emailDataJSON))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiToken))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to send email: %s", string(bodyBytes))
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
