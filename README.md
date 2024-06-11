@@ -8,6 +8,6 @@
 - [ ] Initialize project using kubebuilder cli 
 - [ ] Create CRDs 
 - [ ] Implement validation webhooks 
-- [ ] Implement reconcillation logic 
+- [ ] Implement reconciliation logic 
 - [ ] Create API tokens on the email providers 
 - [ ] Find a secure way to store API tokens 
