@@ -18,7 +18,13 @@ package controller
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,22 +42,80 @@ type EmailSenderConfigReconciler struct {
 // +kubebuilder:rbac:groups=example.emailsender.yusuf,resources=emailsenderconfigs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=example.emailsender.yusuf,resources=emailsenderconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=example.emailsender.yusuf,resources=emailsenderconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the EmailSenderConfig object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.2/pkg/reconcile
+// Reconcile is part of the main kubernetes reconciliation loop
 func (r *EmailSenderConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// Fetch the EmailSenderConfig instance
+	emailSenderConfig := &examplev1.EmailSenderConfig{}
+	err := r.Get(ctx, req.NamespacedName, emailSenderConfig)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Object not found, return. Created objects are automatically garbage collected.
+			// For additional cleanup logic use finalizers.
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		return ctrl.Result{}, err
+	}
+
+	// Log creation or update events
+	if emailSenderConfig.ObjectMeta.Generation == 1 {
+		logger.Info("EmailSenderConfig created", "name", emailSenderConfig.Name, "namespace", emailSenderConfig.Namespace)
+	} else {
+		logger.Info("EmailSenderConfig updated", "name", emailSenderConfig.Name, "namespace", emailSenderConfig.Namespace)
+	}
+
+	// Validate the EmailSenderConfig
+	valid, validationError := r.validateEmailSenderConfig(ctx, emailSenderConfig)
+	if valid {
+		emailSenderConfig.Status.Valid = true
+		emailSenderConfig.Status.ErrorMessage = ""
+	} else {
+		emailSenderConfig.Status.Valid = false
+		emailSenderConfig.Status.ErrorMessage = validationError.Error()
+	}
+
+	emailSenderConfig.Status.LastUpdated = metav1.Now()
+
+	// Update the status
+	err = r.Status().Update(ctx, emailSenderConfig)
+	if err != nil {
+		logger.Error(err, "Failed to update EmailSenderConfig status")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
+}
+
+// validateEmailSenderConfig validates the EmailSenderConfig
+func (r *EmailSenderConfigReconciler) validateEmailSenderConfig(ctx context.Context, config *examplev1.EmailSenderConfig) (bool, error) {
+	if strings.TrimSpace(config.Spec.APITokenSecretRef) == "" {
+		return false, errors.New("APITokenSecretRef cannot be empty")
+	}
+
+	if !isValidEmail(config.Spec.SenderEmail) {
+		return false, errors.New("Invalid senderEmail format")
+	}
+
+	// Check if the secret exists
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, client.ObjectKey{Name: config.Spec.APITokenSecretRef, Namespace: config.Namespace}, secret)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("Referenced secret %s not found", config.Spec.APITokenSecretRef)
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
+// isValidEmail checks if the provided email address is in a valid format
+func isValidEmail(email string) bool {
+	return strings.Contains(email, "@") && strings.Contains(email, ".")
 }
 
 // SetupWithManager sets up the controller with the Manager.
