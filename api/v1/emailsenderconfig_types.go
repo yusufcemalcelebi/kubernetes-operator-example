@@ -25,17 +25,23 @@ import (
 
 // EmailSenderConfigSpec defines the desired state of EmailSenderConfig
 type EmailSenderConfigSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// apiTokenSecretRef is a reference to a secret that contains the API token
+	// +kubebuilder:validation:MinLength=1
+	APITokenSecretRef string `json:"apiTokenSecretRef"`
 
-	// Foo is an example field of EmailSenderConfig. Edit emailsenderconfig_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// senderEmail is the email address to be used as the sender
+	// +kubebuilder:validation:Format=email
+	SenderEmail string `json:"senderEmail"`
 }
 
 // EmailSenderConfigStatus defines the observed state of EmailSenderConfig
 type EmailSenderConfigStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Valid indicates whether the configuration is valid
+	Valid bool `json:"valid"`
+	// LastUpdated indicates the last time the configuration was updated
+	LastUpdated metav1.Time `json:"lastUpdated,omitempty"`
+	// ErrorMessage contains any error messages related to the configuration
+	ErrorMessage string `json:"errorMessage,omitempty"`
 }
 
 // +kubebuilder:object:root=true
