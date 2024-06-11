@@ -7,4 +7,14 @@ layout:
 - go.kubebuilder.io/v4
 projectName: kubernetes-operator-example
 repo: github.com/yusufcemalcelebi/kubernetes-operator-example
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: emailsender.yusuf
+  group: example
+  kind: EmailSenderConfig
+  path: github.com/yusufcemalcelebi/kubernetes-operator-example/api/v1
+  version: v1
 version: "3"

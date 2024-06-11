@@ -1,0 +1,9 @@
+apiVersion: example.emailsender.yusuf/v1
+kind: EmailSenderConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: kubernetes-operator-example
+    app.kubernetes.io/managed-by: kustomize
+  name: emailsenderconfig-sample
+spec:
+  # TODO(user): Add fields here
