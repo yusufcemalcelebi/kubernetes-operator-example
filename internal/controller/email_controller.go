@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	examplev1 "github.com/yusufcemalcelebi/kubernetes-operator-example/api/v1"
+	"github.com/yusufcemalcelebi/kubernetes-operator-example/internal/emailprovider"
 )
 
 // EmailReconciler reconciles a Email object
@@ -79,16 +80,16 @@ func (r *EmailReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	// Validate the email fields
-	if !isValidEmail(email.Spec.RecipientEmail) {
+	if isValidEmail(email.Spec.RecipientEmail) {
 		errMsg := "Invalid recipient email format"
-		logger.Error(errors.New(errMsg), errMsg)
+		logger.Error(fmt.Errorf(errMsg), errMsg)
 		email.Status.DeliveryStatus = "Failed"
 		email.Status.Error = errMsg
 		_ = r.Status().Update(ctx, email)
 		return ctrl.Result{}, nil
 	}
 
-	// Send the email using MailerSend API
+	// Fetch the API token from the secret
 	apiToken, err := r.getSecretValue(ctx, senderConfig.Spec.APITokenSecretRef, email.Namespace)
 	if err != nil {
 		logger.Error(err, "Failed to retrieve API token from secret")
@@ -98,7 +99,19 @@ func (r *EmailReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, nil
 	}
 
-	err = sendEmail(apiToken, senderConfig.Spec.SenderEmail, email.Spec.RecipientEmail, email.Spec.Subject, email.Spec.Body)
+	// Determine the email provider and send the email
+	providerType := emailprovider.ProviderType(senderConfig.Spec.Provider)
+
+	provider, err := emailprovider.NewEmailProvider(providerType, apiToken, senderConfig.Spec.Domain)
+	if err != nil {
+		logger.Error(err, "Failed to create email provider")
+		email.Status.DeliveryStatus = "Failed"
+		email.Status.Error = err.Error()
+		_ = r.Status().Update(ctx, email)
+		return ctrl.Result{}, nil
+	}
+
+	messageID, err := provider.SendEmail(ctx, senderConfig.Spec.SenderEmail, email.Spec.RecipientEmail, email.Spec.Subject, email.Spec.Body)
 	if err != nil {
 		logger.Error(err, "Failed to send email")
 		email.Status.DeliveryStatus = "Failed"
@@ -109,7 +122,7 @@ func (r *EmailReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	// Update status to reflect successful delivery
 	email.Status.DeliveryStatus = "Sent"
-	email.Status.MessageId = "some-message-id" // Replace with actual message ID if available TODO
+	email.Status.MessageId = messageID
 	email.Status.Error = ""
 	err = r.Status().Update(ctx, email)
 	if err != nil {

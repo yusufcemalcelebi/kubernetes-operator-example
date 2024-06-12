@@ -100,6 +100,19 @@ func (r *EmailSenderConfigReconciler) validateEmailSenderConfig(ctx context.Cont
 		return false, errors.New("Invalid senderEmail format")
 	}
 
+	// Validate the Provider field
+	switch config.Spec.Provider {
+	case "MailerSend":
+		// No additional validation needed for MailerSend
+	case "Mailgun":
+		// For Mailgun, ensure the Domain field is not empty
+		if strings.TrimSpace(config.Spec.Domain) == "" {
+			return false, errors.New("Domain cannot be empty for Mailgun provider")
+		}
+	default:
+		return false, fmt.Errorf("Unsupported provider: %s", config.Spec.Provider)
+	}
+
 	// Check if the secret exists
 	secret := &corev1.Secret{}
 	err := r.Get(ctx, client.ObjectKey{Name: config.Spec.APITokenSecretRef, Namespace: config.Namespace}, secret)

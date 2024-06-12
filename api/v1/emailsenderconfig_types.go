@@ -32,6 +32,11 @@ type EmailSenderConfigSpec struct {
 	// senderEmail is the email address to be used as the sender
 	// +kubebuilder:validation:Format=email
 	SenderEmail string `json:"senderEmail"`
+
+	// +kubebuilder:validation:Enum=MailerSend;Mailgun
+	Provider string `json:"provider"`
+
+	Domain string `json:"domain,omitempty"` // For Mailgun
 }
 
 // EmailSenderConfigStatus defines the observed state of EmailSenderConfig
