@@ -8,7 +8,8 @@
 - [x] Create CRDs 
 - [x] Implement reconciliation logic
 - [x] Create API tokens on the email providers 
-- [ ] Local kubernetes environment
+- [x] Local kubernetes 1.30 environment with Kind 
+- [x] Install operator into k8s
 - [ ] Create Secret objects for API tokens
 - [ ] Implement validation webhooks  
-- [ ] Find a secure way to store API tokens 
+- [ ] Find a secure way to store API tokens

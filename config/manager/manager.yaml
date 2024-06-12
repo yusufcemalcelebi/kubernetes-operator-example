@@ -70,6 +70,7 @@ spec:
           capabilities:
             drop:
             - "ALL"
+        imagePullPolicy: Never
         livenessProbe:
           httpGet:
             path: /healthz

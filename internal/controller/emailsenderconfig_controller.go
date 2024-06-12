@@ -62,7 +62,7 @@ func (r *EmailSenderConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	// Log creation or update events
-	if emailSenderConfig.ObjectMeta.Generation == 1 {
+	if emailSenderConfig.Status.LastUpdated.IsZero() {
 		logger.Info("EmailSenderConfig created", "name", emailSenderConfig.Name, "namespace", emailSenderConfig.Namespace)
 	} else {
 		logger.Info("EmailSenderConfig updated", "name", emailSenderConfig.Name, "namespace", emailSenderConfig.Namespace)
