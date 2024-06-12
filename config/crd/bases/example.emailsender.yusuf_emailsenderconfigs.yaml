@@ -44,12 +44,20 @@ spec:
                   the API token
                 minLength: 1
                 type: string
+              domain:
+                type: string
+              provider:
+                enum:
+                - MailerSend
+                - Mailgun
+                type: string
               senderEmail:
                 description: senderEmail is the email address to be used as the sender
                 format: email
                 type: string
             required:
             - apiTokenSecretRef
+            - provider
             - senderEmail
             type: object
           status:
