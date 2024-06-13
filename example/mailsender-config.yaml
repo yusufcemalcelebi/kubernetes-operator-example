@@ -3,6 +3,6 @@ kind: EmailSenderConfig
 metadata:
   name: mailersend-senderconfig
 spec:
-  apiTokenSecretRef: "mailsender-secret"
+  apiTokenSecretRef: "mailersend-secret"
   senderEmail: "yusuf@trial-3z0vklozx2e47qrx.mlsender.net" # Your sender email
   provider: "MailerSend"
