@@ -10,6 +10,8 @@
 - [x] Create API tokens on the email providers 
 - [x] Local kubernetes 1.30 environment with Kind 
 - [x] Install operator into k8s
-- [ ] Create Secret objects for API tokens
+- [x] Create Secret objects for API tokens
+- [x] Send an email using MailSender provider
+- [x] Send an email using Mailgun provider
 - [ ] Implement validation webhooks  
 - [ ] Find a secure way to store API tokens

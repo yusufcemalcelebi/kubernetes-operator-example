@@ -1,0 +1,9 @@
+apiVersion: example.emailsender.yusuf/v1
+kind: EmailSenderConfig
+metadata:
+  name: mailgun-senderconfig
+spec:
+  apiTokenSecretRef: "mailgun-secret"
+  senderEmail: "yusuf@sandbox1fe25b8b38424ec188b52117d708e7f0.mailgun.org" # name@yourdomain
+  provider: "Mailgun"
+  domain: "sandbox1fe25b8b38424ec188b52117d708e7f0.mailgun.org"

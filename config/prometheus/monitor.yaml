@@ -3,10 +3,10 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    control-plane: controller-manager
-    app.kubernetes.io/name: kubernetes-operator-example
+    control-plane: email-operator
+    app.kubernetes.io/name: email-operator
     app.kubernetes.io/managed-by: kustomize
-  name: controller-manager-metrics-monitor
+  name: email-operator-metrics-monitor
   namespace: system
 spec:
   endpoints:
@@ -15,4 +15,4 @@ spec:
       scheme: http
   selector:
     matchLabels:
-      control-plane: controller-manager
+      control-plane: email-operator

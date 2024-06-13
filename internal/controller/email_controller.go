@@ -17,13 +17,9 @@ limitations under the License.
 package controller
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -79,8 +75,14 @@ func (r *EmailReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
+	// Skip sending email if it has already been sent
+	if email.Status.DeliveryStatus == "Sent" {
+		logger.Info("Email already sent, skipping", "name", email.Name, "namespace", email.Namespace)
+		return ctrl.Result{}, nil
+	}
+
 	// Validate the email fields
-	if isValidEmail(email.Spec.RecipientEmail) {
+	if !isValidEmail(email.Spec.RecipientEmail) {
 		errMsg := "Invalid recipient email format"
 		logger.Error(fmt.Errorf(errMsg), errMsg)
 		email.Status.DeliveryStatus = "Failed"
@@ -147,47 +149,6 @@ func (r *EmailReconciler) getSecretValue(ctx context.Context, secretName, namesp
 	}
 
 	return string(apiToken), nil
-}
-
-// sendEmail sends an email using the MailerSend API
-func sendEmail(apiToken, senderEmail, recipientEmail, subject, body string) error {
-	emailData := map[string]interface{}{
-		"from": map[string]string{
-			"email": senderEmail,
-		},
-		"to": []map[string]string{
-			{"email": recipientEmail},
-		},
-		"subject": subject,
-		"text":    body,
-	}
-
-	emailDataJSON, err := json.Marshal(emailData)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", "https://api.mailersend.com/v1/email", bytes.NewBuffer(emailDataJSON))
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiToken))
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to send email: %s", string(bodyBytes))
-	}
-
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

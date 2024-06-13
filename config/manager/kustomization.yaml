@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: my-operator
-  newTag: latest
+  newTag: "1.3"

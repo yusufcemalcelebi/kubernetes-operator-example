@@ -2,7 +2,7 @@ apiVersion: example.emailsender.yusuf/v1
 kind: Email
 metadata:
   labels:
-    app.kubernetes.io/name: kubernetes-operator-example
+    app.kubernetes.io/name: email-operator
     app.kubernetes.io/managed-by: kustomize
   name: email-sample
 spec:

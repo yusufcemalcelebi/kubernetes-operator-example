@@ -1,0 +1,9 @@
+apiVersion: example.emailsender.yusuf/v1
+kind: Email
+metadata:
+  name: test5-email-mailersend
+spec:
+  senderConfigRef: "mailersend-senderconfig"
+  recipientEmail: "yusufcemalcelebi@gmail.com"
+  subject: "Test 5 Email"
+  body: "This is a test email sent by the operator."

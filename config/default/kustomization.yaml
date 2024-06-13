@@ -1,12 +1,12 @@
 # Adds namespace to all resources.
-namespace: kubernetes-operator-example-system
+namespace: default
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-namePrefix: kubernetes-operator-example-
+# namePrefix: kubernetes-operator-example-
 
 # Labels to add to all resources and selectors.
 #labels:
@@ -32,7 +32,7 @@ resources:
 #patches:
 # [METRICS] The following patch will enable the metrics endpoint. Ensure that you also protect this endpoint.
 # More info: https://book.kubebuilder.io/reference/metrics
-# If you want to expose the metric endpoint of your controller-manager uncomment the following line.
+# If you want to expose the metric endpoint of your email-operator uncomment the following line.
 #- path: manager_metrics_patch.yaml
 #  target:
 #    kind: Deployment
